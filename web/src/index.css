@@ -1,0 +1,47 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  max-height: 100dvh;
+}
+
+body {
+  @apply bg-[#09090b] text-zinc-100 font-sans antialiased overflow-hidden;
+  background-image:
+    radial-gradient(120% 80% at 50% -30%, rgba(45, 212, 191, 0.06), transparent),
+    radial-gradient(80% 50% at 100% 0%, rgba(99, 102, 241, 0.05), transparent);
+}
+
+/* Calm surfaces — less “glass stack” noise */
+.surface {
+  @apply rounded-3xl bg-zinc-900/50 border border-zinc-800/80 backdrop-blur-md;
+}
+
+.surface-muted {
+  @apply rounded-2xl bg-zinc-950/60 border border-zinc-800/60;
+}
+
+.page-title {
+  @apply font-display text-3xl sm:text-4xl font-semibold tracking-tight text-white;
+}
+
+.page-sub {
+  @apply mt-2 text-zinc-500 text-[15px] max-w-md leading-relaxed;
+}
+
+/* Legacy — keep for older class names in other files */
+.glass {
+  @apply surface;
+}
+
+.glow-cyan {
+  box-shadow: 0 0 48px -12px rgba(45, 212, 191, 0.2);
+}

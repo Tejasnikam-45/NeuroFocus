@@ -1,0 +1,22 @@
+{
+  "manifest_version": 3,
+  "name": "NeuroFocus",
+  "version": "0.1.0",
+  "description": "Context-aware attention layer — tab signals, Deep Focus, notification DNA.",
+  "permissions": ["storage", "alarms", "activeTab"],
+  "host_permissions": ["http://localhost:3847/*", "http://localhost:5173/*"],
+  "action": {
+    "default_title": "NeuroFocus",
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
