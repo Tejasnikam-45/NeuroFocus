@@ -3,6 +3,7 @@ import { useState, type ReactNode } from "react";
 import { api } from "../lib/api";
 
 const nav = [
+  { to: "/landing", label: "Home" },
   { to: "/", label: "Command" },
   { to: "/agent", label: "Agent" },
   { to: "/notifications", label: "Notifications" },
@@ -51,7 +52,7 @@ export function Shell({ children }: { children: ReactNode }) {
       <header className="shrink-0 z-50 border-b border-zinc-800/80 bg-[#09090b]/90 backdrop-blur-xl">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="flex items-center justify-between gap-4 py-3 sm:py-4">
-            <Link to="/" className="flex items-center gap-3 shrink-0 group">
+            <Link to="/landing" className="flex items-center gap-3 shrink-0 group">
               <div className="w-9 h-9 rounded-2xl bg-gradient-to-br from-teal-400/20 to-cyan-500/10 border border-zinc-700/80 flex items-center justify-center group-hover:border-teal-400/30 transition-colors">
                 <span className="font-display font-semibold text-teal-300 text-sm">N</span>
               </div>
