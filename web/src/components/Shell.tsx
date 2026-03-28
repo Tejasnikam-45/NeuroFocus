@@ -8,6 +8,7 @@ const nav = [
   { to: "/agent", label: "Agent" },
   { to: "/notifications", label: "Notifications" },
   { to: "/flows", label: "Flows" },
+  { to: "/neuro-command-layer", label: "NeuroCommand Layer" },
   { to: "/analytics", label: "Analytics" },
 ];
 

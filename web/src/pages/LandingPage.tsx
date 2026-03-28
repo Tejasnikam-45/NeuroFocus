@@ -313,11 +313,17 @@ export function LandingPage() {
             <span className="text-sm text-zinc-500">© {new Date().getFullYear()} NeuroFocus</span>
           </div>
           <div className="flex flex-wrap justify-center gap-6 text-sm text-zinc-500">
+            <Link to="/agent" className="transition hover:text-zinc-300">
+              Agent
+            </Link>
             <Link to="/flows" className="transition hover:text-zinc-300">
               Flows
             </Link>
             <Link to="/notifications" className="transition hover:text-zinc-300">
               Notifications
+            </Link>
+            <Link to="/neuro-command-layer" className="transition hover:text-zinc-300">
+              NeuroCommand Layer
             </Link>
             <a href="#features" className="transition hover:text-zinc-300">
               Top

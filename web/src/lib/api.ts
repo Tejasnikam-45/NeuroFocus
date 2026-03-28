@@ -16,6 +16,12 @@ async function post<T>(path: string, body: unknown): Promise<T> {
   return r.json() as Promise<T>;
 }
 
+async function del<T>(path: string): Promise<T> {
+  const r = await fetch(`${base}${path}`, { method: "DELETE" });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json() as Promise<T>;
+}
+
 export type NeuroScore = {
   focus: number;
   stress: number;
@@ -66,6 +72,59 @@ export type AgentAction = {
 
 export type FlowStep = { id: string; condition: string; action: string };
 
+export type OverrideRule = {
+  id: string;
+  condition: { sender?: string; context?: string };
+  action: string;
+  priority: string;
+  delayMinutes?: number;
+  learned?: boolean;
+  reinforcementCount?: number;
+};
+
+export type OverrideApplyResult = {
+  final_decision: Record<string, unknown>;
+  overridden: boolean;
+  reason: string;
+  matched_rule_id: string | null;
+};
+
+export type ExplainabilityAlternative = {
+  scenario: string;
+  would_decision: string;
+  one_liner: string;
+};
+
+export type ExplainabilityResult = {
+  explanation: string;
+  key_factors: string[];
+  confidence: number;
+  confidence_reason: string;
+  alternatives: ExplainabilityAlternative[];
+};
+
+export type PriorityPreferences = {
+  emails_over_chats: boolean;
+  work_over_social: boolean;
+  morning_deep_work: boolean;
+};
+
+export type PriorityAnalyzeResult = {
+  task: string;
+  urgency: number;
+  importance: number;
+  attention_cost: "low" | "medium" | "high";
+  final_priority: "low" | "medium" | "high";
+  priority: "low" | "medium" | "high";
+  attention_economy: {
+    value_score: number;
+    net_value: number;
+    rule_fired: string;
+  };
+  recommended_action: "show" | "delay" | "summarize" | "block";
+  rationale: string;
+};
+
 export type AnalyticsPayload = {
   focusScoreWeek: number;
   distractionMinutes: number;
@@ -89,6 +148,50 @@ export const api = {
   flows: () => get<{ flows: { id: string; name: string; steps: FlowStep[]; enabled: boolean }[] }>("/flows"),
   analytics: () => get<AnalyticsPayload>("/analytics"),
   command: (text: string) => post<{ interpreted: string; actions: string[] }>("/voice-command", { text }),
+
+  overrideRules: () => get<{ override_rules: OverrideRule[] }>("/overrides/rules"),
+  overrideApply: (body: {
+    ai_decision: { decision: string; delayMinutes?: number };
+    context: Record<string, unknown>;
+  }) => post<OverrideApplyResult>("/overrides/apply", body),
+  overrideAddRule: (body: {
+    condition: { sender?: string; context?: string };
+    action: string;
+    priority?: string;
+    delayMinutes?: number;
+  }) => post<{ ok: boolean; rule: OverrideRule }>("/overrides/rules", body),
+  overrideDeleteRule: (id: string) => del<{ ok: boolean }>(`/overrides/rules/${encodeURIComponent(id)}`),
+  overrideLearn: (body: { sender: string; action: string; context?: string }) =>
+    post<{ ok: boolean; rule: OverrideRule; reinforcementCount: number; message: string }>("/overrides/learn", body),
+
+  explainabilityAnalyze: (body: {
+    decision: string;
+    focus_level?: number;
+    urgency?: number;
+    context?: { deep_focus?: boolean; in_meeting?: boolean };
+    sender_importance?: number;
+    deadline_hours?: number | null;
+    user_history?: string;
+    delay_minutes?: number;
+  }) => post<ExplainabilityResult>("/explainability/analyze", body),
+
+  priorityPreferences: () => get<{ preferences: PriorityPreferences }>("/priority/preferences"),
+  prioritySetPreferences: (preferences: Partial<PriorityPreferences>) =>
+    post<{ ok: boolean; preferences: PriorityPreferences }>("/priority/preferences", preferences),
+  priorityAnalyze: (body: {
+    task?: string;
+    channel?: string;
+    urgency_signals?: number;
+    task_importance?: number;
+    sender_score?: number;
+    user_focus?: number;
+    past_behavior?: number;
+    deadline_hours?: number | null;
+    deep_focus?: boolean;
+    in_meeting?: boolean;
+    preferences?: Partial<PriorityPreferences>;
+  }) => post<PriorityAnalyzeResult>("/priority/analyze", body),
+
   refreshContext: () => post<{ ok: boolean }>("/context/refresh", {}),
   agentMessage: (text: string) => post<{ reply: string; enqueued: AgentAction[] }>("/agent/message", { text }),
   agentApprove: (id: string) => post<{ ok: boolean; action: AgentAction }>("/agent/approve", { id }),
