@@ -27,6 +27,9 @@ import {
   listUpcomingEvents,
 } from "./googleAgent.js";
 import { computeAvailabilityOnly, computeMeetingPlan } from "./meetingScheduler.js";
+import { applyOverrideEngine, defaultOverrideRules } from "./decisionOverrideEngine.js";
+import { analyzeExplainability } from "./cognitiveTransparency.js";
+import { analyzePriority, defaultPreferences } from "./priorityIntelligence.js";
 import {
   listInboxMessages,
   getMessageFull,
@@ -55,6 +58,14 @@ const pendingEmailSends = new Map();
 const oauthStates = new Map();
 
 const meetingProposals = new Map();
+
+let overrideRules = defaultOverrideRules();
+const overrideLearnCounts = new Map();
+
+let priorityPreferences = defaultPreferences({});
+function makeOverrideRuleId() {
+  return `or_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 9)}`;
+}
 function pruneMeetingProposals() {
   const cutoff = Date.now() - 30 * 60 * 1000;
   for (const [k, v] of meetingProposals.entries()) {
@@ -1144,6 +1155,105 @@ app.post("/api/context/refresh", (_req, res) => {
 
 app.get("/api/health", (_req, res) => {
   res.json({ ok: true, service: "neurofocus-api" });
+});
+
+/** Decision Override Engine — rules + apply + learn from repeated overrides */
+app.get("/api/overrides/rules", (_req, res) => {
+  res.json({ override_rules: overrideRules });
+});
+
+app.post("/api/overrides/rules", (req, res) => {
+  const body = req.body || {};
+  const { condition, action, priority, delayMinutes } = body;
+  if (!condition || typeof condition !== "object" || !action) {
+    return res.status(400).json({ error: "condition (object) and action are required" });
+  }
+  const row = {
+    id: makeOverrideRuleId(),
+    condition,
+    action,
+    priority: priority || "medium",
+    delayMinutes: delayMinutes != null ? Number(delayMinutes) : undefined,
+    learned: false,
+  };
+  overrideRules.push(row);
+  res.json({ ok: true, rule: row });
+});
+
+app.delete("/api/overrides/rules/:id", (req, res) => {
+  const before = overrideRules.length;
+  overrideRules = overrideRules.filter((r) => r.id !== req.params.id);
+  res.json({ ok: overrideRules.length < before });
+});
+
+app.post("/api/overrides/apply", (req, res) => {
+  const body = req.body || {};
+  const aiDecision = body.ai_decision || body.aiDecision;
+  const context = body.context || {};
+  if (!aiDecision || typeof aiDecision.decision !== "string") {
+    return res.status(400).json({ error: "ai_decision.decision (string) is required" });
+  }
+  const result = applyOverrideEngine(aiDecision, context, overrideRules);
+  res.json(result);
+});
+
+/** Priority Intelligence — scoring, attention cost, recommended_action */
+app.get("/api/priority/preferences", (_req, res) => {
+  res.json({ preferences: priorityPreferences });
+});
+
+app.post("/api/priority/preferences", (req, res) => {
+  priorityPreferences = defaultPreferences({ ...priorityPreferences, ...(req.body || {}) });
+  res.json({ ok: true, preferences: priorityPreferences });
+});
+
+app.post("/api/priority/analyze", (req, res) => {
+  try {
+    const body = req.body || {};
+    const prefs = body.preferences ? defaultPreferences(body.preferences) : priorityPreferences;
+    const out = analyzePriority(body, prefs);
+    res.json(out);
+  } catch (e) {
+    res.status(400).json({ error: String(e?.message || e) });
+  }
+});
+
+/** Cognitive Transparency — explain decisions + what-if alternatives */
+app.post("/api/explainability/analyze", (req, res) => {
+  try {
+    const out = analyzeExplainability(req.body || {});
+    res.json(out);
+  } catch (e) {
+    res.status(400).json({ error: String(e?.message || e) });
+  }
+});
+
+app.post("/api/overrides/learn", (req, res) => {
+  const { sender, action, context } = req.body || {};
+  if (!sender || !action) {
+    return res.status(400).json({ error: "sender and action are required" });
+  }
+  const key = `${String(sender).toLowerCase()}|${String(action)}`;
+  const n = (overrideLearnCounts.get(key) || 0) + 1;
+  overrideLearnCounts.set(key, n);
+  const rule = {
+    id: makeOverrideRuleId(),
+    condition: { sender: String(sender), context: context || "any" },
+    action: String(action),
+    priority: "high",
+    learned: true,
+    reinforcementCount: n,
+  };
+  overrideRules.push(rule);
+  res.json({
+    ok: true,
+    rule,
+    reinforcementCount: n,
+    message:
+      n >= 2
+        ? "Pattern reinforced — similar overrides will reuse this rule."
+        : "Captured from your manual override; repeat similar overrides to reinforce.",
+  });
 });
 
 app.listen(PORT, "0.0.0.0", () => {

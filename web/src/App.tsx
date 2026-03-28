@@ -4,6 +4,10 @@ import { Dashboard } from "./pages/Dashboard";
 import { AgentPage } from "./pages/AgentPage";
 import { NotificationsPage } from "./pages/NotificationsPage";
 import { FlowsPage } from "./pages/FlowsPage";
+import { NeuroCommandLayerPage } from "./pages/NeuroCommandLayerPage";
+import { DecisionOverridePage } from "./pages/DecisionOverridePage";
+import { CognitiveTransparencyPage } from "./pages/CognitiveTransparencyPage";
+import { PriorityIntelligencePage } from "./pages/PriorityIntelligencePage";
 import { AnalyticsPage } from "./pages/AnalyticsPage";
 import { LandingPage } from "./pages/LandingPage";
 
@@ -24,6 +28,10 @@ export default function App() {
         <Route path="/agent" element={<AgentPage />} />
         <Route path="/notifications" element={<NotificationsPage />} />
         <Route path="/flows" element={<FlowsPage />} />
+        <Route path="/neuro-command-layer" element={<NeuroCommandLayerPage />} />
+        <Route path="/decision-override" element={<DecisionOverridePage />} />
+        <Route path="/cognitive-transparency" element={<CognitiveTransparencyPage />} />
+        <Route path="/priority-intelligence" element={<PriorityIntelligencePage />} />
         <Route path="/analytics" element={<AnalyticsPage />} />
       </Route>
     </Routes>
