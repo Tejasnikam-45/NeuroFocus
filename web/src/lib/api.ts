@@ -12,8 +12,18 @@ async function post<T>(path: string, body: unknown): Promise<T> {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  if (!r.ok) throw new Error(await r.text());
-  return r.json() as Promise<T>;
+  const text = await r.text();
+  if (!r.ok) {
+    let msg = text.length > 280 ? `${text.slice(0, 280)}…` : text;
+    try {
+      const j = JSON.parse(text) as { error?: string };
+      if (typeof j?.error === "string") msg = j.error;
+    } catch {
+      /* plain text */
+    }
+    throw new Error(msg);
+  }
+  return JSON.parse(text) as T;
 }
 
 async function del<T>(path: string): Promise<T> {
@@ -44,16 +54,47 @@ export type Prediction = {
   rationale: string;
 };
 
+export type NotificationDecision = "show_now" | "delay" | "summarize_later" | "block";
+
 export type NotificationDNA = {
   id: string;
   title: string;
+  channel?: string;
+  summary?: string;
   urgency: number;
   relevance: number;
   interruptionCost: number;
   senderImportance: number;
-  decision: "show_now" | "delay" | "summarize_later";
+  attention_cost: number;
+  attention_value: number;
+  confidence: number;
+  focusMinutesEstimate: number;
+  valueLabel: "high" | "medium" | "low";
+  proposedDecision: NotificationDecision;
+  decision: NotificationDecision;
+  failSafeApplied?: boolean;
+  suggestionNote?: string;
   delayMinutes?: number;
-  summary?: string;
+  digestInMinutes?: number;
+  why: string[];
+  flowLog: string[];
+  userOverride?: boolean;
+  overrideLabel?: string;
+};
+
+export type NotificationsGmailMeta = {
+  connected: boolean;
+  email: string | null;
+  fetchedAt: number | null;
+  error: string | null;
+  source: "gmail" | "demo";
+};
+
+export type NotificationsPayload = {
+  items: NotificationDNA[];
+  failSafeConfidence: number;
+  tagline: string;
+  gmail?: NotificationsGmailMeta;
 };
 
 export type FocusExit = {
@@ -142,7 +183,12 @@ export const api = {
   neuroScore: () => get<NeuroScore>("/neuro-score"),
   intent: () => get<Intent>("/intent"),
   predict: () => get<Prediction>("/predict-attention"),
-  notifications: () => get<{ items: NotificationDNA[] }>("/notifications/dna"),
+  notifications: () => get<NotificationsPayload>("/notifications/dna"),
+  notificationsAction: (id: string, action: "force_show" | "delay" | "digest" | "block_confirm" | "reset") =>
+    post<{ ok: boolean; item: NotificationDNA }>("/notifications/action", { id, action }),
+  notificationsLog: () => get<{ entries: Array<Record<string, unknown>> }>("/notifications/log"),
+  notificationsFeedback: (id: string, helpful: boolean) =>
+    post<{ ok: boolean; message?: string }>("/notifications/feedback", { id, helpful }),
   focusExit: () => get<FocusExit>("/focus-exit"),
   agentQueue: () => get<{ actions: AgentAction[] }>("/agent/queue"),
   flows: () => get<{ flows: { id: string; name: string; steps: FlowStep[]; enabled: boolean }[] }>("/flows"),
