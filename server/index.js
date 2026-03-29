@@ -30,6 +30,8 @@ import { computeAvailabilityOnly, computeMeetingPlan } from "./meetingScheduler.
 import { applyOverrideEngine, defaultOverrideRules } from "./decisionOverrideEngine.js";
 import { analyzeExplainability } from "./cognitiveTransparency.js";
 import { analyzePriority, defaultPreferences } from "./priorityIntelligence.js";
+import { getAttentionQueue, FAILSAFE_CONFIDENCE } from "./attentionMarket.js";
+import { fetchEnrichedGmailNotifications } from "./gmailNotifications.js";
 import {
   listInboxMessages,
   getMessageFull,
@@ -152,42 +154,217 @@ app.get("/api/predict-attention", (_req, res) => {
   });
 });
 
-app.get("/api/notifications/dna", (_req, res) => {
+/** Attention Market — user overrides + action log (in-memory demo) */
+const notificationUserOverrides = new Map();
+const notificationActionLog = [];
+
+/** Gmail inbox snapshot for Attention Market (refreshed on DNA GET + SSE tick) */
+let gmailNotificationCache = {
+  connected: false,
+  email: null,
+  items: null,
+  error: null,
+  fetchedAt: null,
+};
+
+async function refreshGmailNotificationCache() {
+  const auth = await getOAuthClientWithRefresh();
+  if (!auth) {
+    gmailNotificationCache = {
+      connected: false,
+      email: null,
+      items: null,
+      error: null,
+      fetchedAt: Date.now(),
+    };
+    return gmailNotificationCache;
+  }
+  let email = null;
+  try {
+    email = await getEmailFromClient(auth);
+  } catch {
+    email = null;
+  }
+  try {
+    const items = await fetchEnrichedGmailNotifications(auth, {
+      maxResults: 20,
+      q: "in:inbox newer_than:7d",
+    });
+    gmailNotificationCache = {
+      connected: true,
+      email,
+      items,
+      error: null,
+      fetchedAt: Date.now(),
+    };
+  } catch (e) {
+    gmailNotificationCache = {
+      connected: true,
+      email,
+      items: null,
+      error: String(e.message || e),
+      fetchedAt: Date.now(),
+    };
+  }
+  return gmailNotificationCache;
+}
+
+function getNotificationQueueSnapshot() {
+  if (gmailNotificationCache.items && gmailNotificationCache.items.length > 0) {
+    return gmailNotificationCache.items;
+  }
+  return getAttentionQueue();
+}
+
+function applyNotificationOverrides(item) {
+  const o = notificationUserOverrides.get(item.id);
+  if (!o) return { ...item, userOverride: false };
+  const out = {
+    ...item,
+    decision: o.decision,
+    userOverride: true,
+    overrideLabel: o.label || "Manual override",
+  };
+  // Do not use ?? here: undefined must clear delay/digest when switching decisions (e.g. force show).
+  if (Object.prototype.hasOwnProperty.call(o, "delayMinutes")) {
+    out.delayMinutes = o.delayMinutes;
+  }
+  if (o.decision === "summarize_later") {
+    out.digestInMinutes = item.digestInMinutes;
+  } else {
+    out.digestInMinutes = undefined;
+  }
+  return out;
+}
+
+app.get("/api/notifications/dna", async (_req, res) => {
+  await refreshGmailNotificationCache();
+  const items = getNotificationQueueSnapshot().map(applyNotificationOverrides);
   res.json({
-    items: [
-      {
-        id: "1",
-        title: "Slack: @you in #eng-incidents",
-        urgency: 88,
-        relevance: 72,
-        interruptionCost: 82,
-        senderImportance: 90,
-        decision: "show_now",
-        summary: "Production alert thread",
-      },
-      {
-        id: "2",
-        title: "Newsletter: Weekly digest",
-        urgency: 12,
-        relevance: 22,
-        interruptionCost: 65,
-        senderImportance: 15,
-        decision: "summarize_later",
-        summary: "Batch with other newsletters after focus block",
-      },
-      {
-        id: "3",
-        title: "Calendar: 1:1 with manager",
-        urgency: 45,
-        relevance: 80,
-        interruptionCost: 40,
-        senderImportance: 85,
-        decision: "delay",
-        delayMinutes: 8,
-        summary: "Remind when predicted task window ends",
-      },
-    ],
+    items,
+    failSafeConfidence: FAILSAFE_CONFIDENCE,
+    tagline: "We don't just filter notifications — we economically evaluate them.",
+    gmail: {
+      connected: gmailNotificationCache.connected,
+      email: gmailNotificationCache.email,
+      fetchedAt: gmailNotificationCache.fetchedAt,
+      error: gmailNotificationCache.error,
+      source:
+        gmailNotificationCache.items && gmailNotificationCache.items.length > 0 ? "gmail" : "demo",
+    },
   });
+});
+
+app.get("/api/notifications/stream", async (req, res) => {
+  res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
+  res.setHeader("Cache-Control", "no-cache, no-transform");
+  res.setHeader("Connection", "keep-alive");
+  res.setHeader("X-Accel-Buffering", "no");
+  if (typeof res.flushHeaders === "function") res.flushHeaders();
+
+  const push = async () => {
+    await refreshGmailNotificationCache();
+    const items = getNotificationQueueSnapshot().map(applyNotificationOverrides);
+    const payload = {
+      items,
+      failSafeConfidence: FAILSAFE_CONFIDENCE,
+      tagline: "We don't just filter notifications — we economically evaluate them.",
+      gmail: {
+        connected: gmailNotificationCache.connected,
+        email: gmailNotificationCache.email,
+        fetchedAt: gmailNotificationCache.fetchedAt,
+        error: gmailNotificationCache.error,
+        source:
+          gmailNotificationCache.items && gmailNotificationCache.items.length > 0 ? "gmail" : "demo",
+      },
+    };
+    res.write(`data: ${JSON.stringify(payload)}\n\n`);
+  };
+
+  try {
+    await push();
+  } catch (e) {
+    res.write(`event: error\ndata: ${JSON.stringify(String(e.message || e))}\n\n`);
+  }
+
+  const interval = setInterval(() => {
+    push().catch(() => {});
+  }, 30000);
+
+  req.on("close", () => {
+    clearInterval(interval);
+  });
+});
+
+app.post("/api/notifications/action", (req, res) => {
+  const id = String(req.body?.id ?? "");
+  const action = String(req.body?.action ?? "").toLowerCase();
+  if (!id) return res.status(400).json({ error: "id required" });
+  const allowed = new Set(["force_show", "delay", "digest", "block_confirm", "reset"]);
+  if (!allowed.has(action)) {
+    return res.status(400).json({ error: "invalid action" });
+  }
+
+  const base = getNotificationQueueSnapshot().find((x) => x.id === id);
+  if (!base) return res.status(404).json({ error: "unknown notification id" });
+
+  let patch = { decision: base.decision, delayMinutes: base.delayMinutes, label: "" };
+  if (action === "force_show") {
+    patch = { decision: "show_now", delayMinutes: undefined, label: "You chose: show now" };
+  } else if (action === "delay") {
+    patch = {
+      decision: "delay",
+      delayMinutes: clampNotificationDelay(base.delayMinutes ?? 15),
+      label: "You chose: snooze / delay",
+    };
+  } else if (action === "digest") {
+    patch = { decision: "summarize_later", delayMinutes: undefined, label: "You chose: batch to digest" };
+  } else if (action === "block_confirm") {
+    patch = { decision: "block", delayMinutes: undefined, label: "You confirmed block" };
+  } else if (action === "reset") {
+    notificationUserOverrides.delete(id);
+    notificationActionLog.unshift({
+      at: new Date().toISOString(),
+      id,
+      action: "reset",
+      note: "Cleared override — back to engine",
+    });
+    const cleared = getNotificationQueueSnapshot().find((x) => x.id === id);
+    return res.json({ ok: true, item: applyNotificationOverrides(cleared || base) });
+  }
+
+  notificationUserOverrides.set(id, patch);
+  notificationActionLog.unshift({
+    at: new Date().toISOString(),
+    id,
+    action,
+    previousDecision: base.decision,
+  });
+  const fresh = getNotificationQueueSnapshot().find((x) => x.id === id);
+  res.json({ ok: true, item: applyNotificationOverrides(fresh || base) });
+});
+
+function clampNotificationDelay(n) {
+  const x = Number(n);
+  if (Number.isNaN(x)) return 15;
+  return Math.min(120, Math.max(3, Math.round(x)));
+}
+
+app.get("/api/notifications/log", (_req, res) => {
+  res.json({ entries: notificationActionLog.slice(0, 50) });
+});
+
+app.post("/api/notifications/feedback", (req, res) => {
+  const id = String(req.body?.id ?? "");
+  const helpful = req.body?.helpful;
+  if (!id) return res.status(400).json({ error: "id required" });
+  notificationActionLog.unshift({
+    at: new Date().toISOString(),
+    id,
+    action: "feedback",
+    helpful: Boolean(helpful),
+  });
+  res.json({ ok: true, message: "Thanks — this tunes future attention weights (demo log)." });
 });
 
 app.get("/api/focus-exit", (_req, res) => {
