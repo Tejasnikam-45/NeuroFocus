@@ -150,14 +150,14 @@ export function DecisionOverridePage() {
         <p className="mt-4 text-sm italic text-teal-400/85 border-l-2 border-teal-500/40 pl-4">{DEMO_LINE}</p>
       </header>
 
-      <div className="rounded-2xl border border-zinc-800/80 bg-zinc-950/50 p-5 font-mono text-xs text-zinc-400">
+      <div className="flow-strip">
         <span className="text-zinc-500">Flow · </span>
-        <span className="text-zinc-300">AI Decision</span>
-        <span className="text-zinc-600"> → </span>
+        <span className="text-zinc-200 dark:text-zinc-300">AI Decision</span>
+        <span className="text-zinc-500 dark:text-zinc-600"> → </span>
         <span className="text-teal-400/90">Override Engine</span>
-        <span className="text-zinc-600"> → </span>
-        <span className="text-zinc-300">Apply rules</span>
-        <span className="text-zinc-600"> → </span>
+        <span className="text-zinc-500 dark:text-zinc-600"> → </span>
+        <span className="text-zinc-200 dark:text-zinc-300">Apply rules</span>
+        <span className="text-zinc-500 dark:text-zinc-600"> → </span>
         <span className="text-violet-300/90">Final decision</span>
       </div>
 

@@ -57,27 +57,27 @@ export function NeuroCommandLayerPage() {
         <pre className="font-mono text-xs sm:text-sm text-zinc-300 leading-relaxed whitespace-pre min-w-[min(100%,640px)]">
           <span className="text-zinc-500">Incoming event / AI decision</span>
           {"\n"}
-          <span className="text-zinc-600">  →</span> <span className="text-amber-400/90">Priority Intelligence</span>{" "}
-          <span className="text-zinc-600">(scores, attention cost)</span>
+          <span className="text-zinc-400 dark:text-zinc-600">  →</span> <span className="text-amber-400/90">Priority Intelligence</span>{" "}
+          <span className="text-zinc-400 dark:text-zinc-600">(scores, attention cost)</span>
           {"\n"}
-          <span className="text-zinc-600">  →</span> <span className="text-teal-400/90">Override Engine</span>{" "}
-          <span className="text-zinc-600">(user rules)</span>
+          <span className="text-zinc-400 dark:text-zinc-600">  →</span> <span className="text-teal-400/90">Override Engine</span>{" "}
+          <span className="text-zinc-400 dark:text-zinc-600">(user rules)</span>
           {"\n"}
-          <span className="text-zinc-600">  →</span> <span className="text-violet-400/90">Transparency Engine</span>{" "}
-          <span className="text-zinc-600">(why / what-if)</span>
+          <span className="text-zinc-400 dark:text-zinc-600">  →</span> <span className="text-violet-400/90">Transparency Engine</span>{" "}
+          <span className="text-zinc-400 dark:text-zinc-600">(why / what-if)</span>
           {"\n"}
-          <span className="text-zinc-600">  →</span> <span className="text-cyan-400/90">Control layer</span>{" "}
-          <span className="text-zinc-600">(confidence, safety)</span>
+          <span className="text-zinc-400 dark:text-zinc-600">  →</span> <span className="text-cyan-400/90">Control layer</span>{" "}
+          <span className="text-zinc-400 dark:text-zinc-600">(confidence, safety)</span>
           {"\n"}
-          <span className="text-zinc-600">  →</span> <span className="text-zinc-200">Final output:</span>
+          <span className="text-zinc-400 dark:text-zinc-600">  →</span> <span className="text-zinc-200">Final output:</span>
           {"\n"}
-          <span className="text-zinc-600">       ├──</span> Execute
+          <span className="text-zinc-400 dark:text-zinc-600">       ├──</span> Execute
           {"\n"}
-          <span className="text-zinc-600">       ├──</span> Delay
+          <span className="text-zinc-400 dark:text-zinc-600">       ├──</span> Delay
           {"\n"}
-          <span className="text-zinc-600">       ├──</span> Suggest
+          <span className="text-zinc-400 dark:text-zinc-600">       ├──</span> Suggest
           {"\n"}
-          <span className="text-zinc-600">       └──</span> Block
+          <span className="text-zinc-400 dark:text-zinc-600">       └──</span> Block
         </pre>
       </div>
 
@@ -88,7 +88,7 @@ export function NeuroCommandLayerPage() {
           {"\n"}
           {tree.map((row) => (
             <span key={row.id}>
-              <span className="text-zinc-600">{row.branch}</span>{" "}
+              <span className="text-zinc-400 dark:text-zinc-600">{row.branch}</span>{" "}
               <span className={"muted" in row && row.muted ? "text-zinc-500 italic" : undefined}>{row.label}</span>
               {"\n"}
             </span>
@@ -97,7 +97,7 @@ export function NeuroCommandLayerPage() {
       </div>
 
       <div className="space-y-6">
-        <h3 className="font-display text-lg font-semibold text-white tracking-tight">Capabilities</h3>
+        <h3 className="font-display text-lg font-semibold text-zinc-900 dark:text-white tracking-tight">Capabilities</h3>
         <div className="grid gap-4 lg:grid-cols-3">
           {tree
             .filter((row) => row.id !== "roadmap")
@@ -118,9 +118,9 @@ export function NeuroCommandLayerPage() {
             })}
         </div>
 
-        <div className="rounded-2xl border border-dashed border-zinc-700/80 bg-zinc-950/40 p-5 sm:p-6">
-          <h4 className="font-display text-base font-semibold text-zinc-400">More features — roadmap</h4>
-          <p className="mt-2 text-sm text-zinc-500 leading-relaxed">
+        <div className="rounded-2xl border border-dashed border-zinc-600/80 bg-zinc-900 p-5 sm:p-6 text-zinc-100 dark:border-zinc-700/80 dark:bg-zinc-950/40">
+          <h4 className="font-display text-base font-semibold text-zinc-300 dark:text-zinc-400">More features — roadmap</h4>
+          <p className="mt-2 text-sm text-zinc-400 dark:text-zinc-500 leading-relaxed">
             Additional branches will plug into the same layer: federated policies, team norms, audit trails, and deeper
             calendar / comms integrations — without fragmenting the command surface.
           </p>
@@ -129,7 +129,7 @@ export function NeuroCommandLayerPage() {
 
       <div className="surface rounded-2xl p-5 sm:p-6 border border-zinc-800/80">
         <p className="text-sm text-zinc-300 leading-relaxed">
-          Use the <span className="text-zinc-100 font-medium">Voice / Cmd</span> field in the app header anytime. Successful
+          Use the <span className="text-zinc-200 dark:text-zinc-100 font-medium">header command field</span> (press Enter) anytime. Successful
           parses show a short summary with optional pipeline details — the same path the extension and dashboard share.
         </p>
       </div>

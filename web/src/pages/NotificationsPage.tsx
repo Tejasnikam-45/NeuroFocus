@@ -46,7 +46,7 @@ function AttentionMeter({ n }: { n: NotificationDNA }) {
   const win = val > cost;
   return (
     <div className="space-y-2">
-      <p className="text-[10px] text-zinc-600">
+      <p className="text-[10px] text-zinc-500 dark:text-zinc-600">
         Both bars use the same 0–100 scale so you can compare cost vs value fairly.
       </p>
       <div className="flex justify-between text-[11px] text-zinc-500">
@@ -245,7 +245,7 @@ export function NotificationsPage() {
               </span>
               Live Gmail inbox
             </span>
-            <span className="text-zinc-600">·</span>
+            <span className="text-zinc-500 dark:text-zinc-600">·</span>
             <span className="text-zinc-200">{payload.gmail.email}</span>
             {payload.gmail.fetchedAt != null && (
               <span className="text-zinc-500">
@@ -321,7 +321,7 @@ export function NotificationsPage() {
                     This notification costs ~<strong className="text-zinc-200">{n.focusMinutesEstimate} min</strong> of
                     focus
                   </span>
-                  <span className="text-zinc-600">·</span>
+                  <span className="text-zinc-500 dark:text-zinc-600">·</span>
                   <span className="text-zinc-400">
                     Value:{" "}
                     <strong
@@ -336,7 +336,7 @@ export function NotificationsPage() {
                       {n.valueLabel === "high" ? "High" : n.valueLabel === "medium" ? "Medium" : "Low"}
                     </strong>
                   </span>
-                  <span className="text-zinc-600">·</span>
+                  <span className="text-zinc-500 dark:text-zinc-600">·</span>
                   <span className="text-zinc-500">
                     Confidence <span className="font-mono text-zinc-300">{n.confidence}%</span>
                   </span>
@@ -386,7 +386,7 @@ export function NotificationsPage() {
                 >
                   Flow
                 </button>
-                <span className="text-zinc-600 self-center">|</span>
+                <span className="text-zinc-500 dark:text-zinc-600 self-center">|</span>
                 <button
                   type="button"
                   disabled={busyId === n.id}
@@ -427,7 +427,7 @@ export function NotificationsPage() {
                 >
                   Reset
                 </button>
-                <span className="text-zinc-600 self-center">|</span>
+                <span className="text-zinc-500 dark:text-zinc-600 self-center">|</span>
                 <button
                   type="button"
                   onClick={() => void sendFeedback(n.id, true)}

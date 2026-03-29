@@ -6,15 +6,18 @@
   color-scheme: dark;
 }
 
-html,
+html {
+  min-height: 100%;
+}
+
 body,
 #root {
-  height: 100%;
-  max-height: 100dvh;
+  min-height: 100%;
+  min-height: 100dvh;
 }
 
 body {
-  @apply bg-[#09090b] text-zinc-100 font-sans antialiased overflow-hidden;
+  @apply bg-[#09090b] text-zinc-100 font-sans antialiased overflow-x-hidden overflow-y-auto;
   background-image:
     radial-gradient(120% 80% at 50% -30%, rgba(45, 212, 191, 0.06), transparent),
     radial-gradient(80% 50% at 100% 0%, rgba(99, 102, 241, 0.05), transparent);

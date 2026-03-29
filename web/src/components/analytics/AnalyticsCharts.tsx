@@ -29,7 +29,7 @@ const commonTooltip = {
   borderWidth: 1,
   padding: 12,
   cornerRadius: 10,
-  titleFont: { ...chartFont, size: 13, weight: "600" as const },
+  titleFont: { ...chartFont, size: 13, weight: 600 },
   bodyFont: { ...chartFont, size: 12 },
   displayColors: true,
 };
@@ -107,10 +107,11 @@ export function TimePieChart({ data, selectedPieIndex, onSelectPieSlice }: Props
 }
 
 export function FocusBarChart({ data, selectedDayIndex, onSelectDay }: Props) {
-  const avg = useMemo(
-    () => data.weeklyFocusByDay.reduce((a, x) => a + x.focus, 0) / data.weeklyFocusByDay.length,
-    [data.weeklyFocusByDay]
-  );
+  const avg = useMemo(() => {
+    const arr = data.weeklyFocusByDay;
+    if (!arr.length) return 0;
+    return arr.reduce((a, x) => a + x.focus, 0) / arr.length;
+  }, [data.weeklyFocusByDay]);
 
   const barData = useMemo(
     () => ({
@@ -239,6 +240,7 @@ export function DnaHorizontalBar({ data }: Pick<Props, "data">) {
 
 export function weekAverageFocus(data: AnalyticsPayload) {
   const arr = data.weeklyFocusByDay;
+  if (!arr.length) return 0;
   return arr.reduce((a, x) => a + x.focus, 0) / arr.length;
 }
 

@@ -4,6 +4,11 @@ import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import "./index.css";
 
+(() => {
+  const isLight = localStorage.getItem("nf-theme") === "light";
+  document.documentElement.classList.toggle("dark", !isLight);
+})();
+
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <BrowserRouter>

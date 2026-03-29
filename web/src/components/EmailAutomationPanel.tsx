@@ -260,8 +260,8 @@ export function EmailAutomationPanel() {
     <section className="space-y-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h3 className="font-display text-lg font-semibold text-white">Email automation</h3>
-          <p className="text-sm text-zinc-500">
+          <h3 className="font-display text-lg font-semibold text-zinc-900 dark:text-white">Email automation</h3>
+          <p className="text-sm text-zinc-600 dark:text-zinc-500">
             Read & extract → draft reply → preview with confidence → approve (human-in-the-loop). Fail-safe blocks send below 40%
             unless forced.
           </p>
@@ -346,7 +346,7 @@ export function EmailAutomationPanel() {
                   >
                     <p className="font-medium text-zinc-100 line-clamp-1">{m.subject}</p>
                     <p className="text-xs text-zinc-500 line-clamp-1">{m.from}</p>
-                    <p className="text-xs text-zinc-600 mt-1 line-clamp-2">{m.snippet}</p>
+                    <p className="text-xs text-zinc-500 mt-1 line-clamp-2">{m.snippet}</p>
                   </button>
                 </li>
               ))}
@@ -431,7 +431,7 @@ export function EmailAutomationPanel() {
         >
           Undo last action
         </button>
-        <span className="text-[11px] text-zinc-600">
+        <span className="text-[11px] text-zinc-600 dark:text-zinc-500">
           Removes last draft or moves last sent reply to trash (Gmail).
         </span>
       </div>

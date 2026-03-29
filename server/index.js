@@ -33,6 +33,15 @@ import { analyzePriority, defaultPreferences } from "./priorityIntelligence.js";
 import { getAttentionQueue, FAILSAFE_CONFIDENCE } from "./attentionMarket.js";
 import { fetchEnrichedGmailNotifications } from "./gmailNotifications.js";
 import {
+  ingestContext,
+  getNeuroScorePayload,
+  getIntentPayload,
+  getPredictionPayload,
+  getDashboardPayload,
+  getIngestMeta,
+} from "./contextSignals.js";
+import { buildAnalyticsPayload } from "./analyticsEngine.js";
+import {
   listInboxMessages,
   getMessageFull,
   extractTasksFromEmail,
@@ -91,67 +100,103 @@ const PORT = Number(process.env.PORT) || 3847;
 app.use(cors({ origin: true }));
 app.use(express.json());
 
-/** Simulated signals — replace with extension POST /context/ingest */
-function mockSignals() {
-  const t = Date.now() / 8000;
-  return {
-    tabSwitchesPerMin: 4 + Math.sin(t) * 3,
-    dwellSeconds: 45 + Math.cos(t) * 20,
-    backtrackRatio: 0.15 + Math.sin(t * 0.7) * 0.1,
-    activeDomain: "github.com",
-    titleKeywords: ["pull request", "typescript", "review"],
-  };
-}
-
+/** NeuroScore / intent / timeline — unified on contextSignals (+ optional POST /api/context/ingest). */
 app.get("/api/neuro-score", (_req, res) => {
-  const s = mockSignals();
-  const confusion = Math.min(100, Math.round(s.backtrackRatio * 100 + s.tabSwitchesPerMin * 4));
-  const stress = Math.min(100, Math.round(30 + (s.tabSwitchesPerMin > 6 ? 25 : 0)));
-  const focus = Math.max(0, Math.min(100, 100 - confusion / 2 - stress / 3));
-  const deepFocusSuggested = focus < 42 || confusion > 55;
-
-  let label = "Stable attention";
-  let recommendation = "Maintain current rhythm; batch low-priority pings.";
-  if (deepFocusSuggested) {
-    label = "Focus decay detected";
-    recommendation = "User is losing focus → activate Deep Focus Mode; delay non-critical notifications.";
-  } else if (stress > 60) {
-    label = "Overload risk";
-    recommendation = "Reduce context switches; surface only high-DNA notifications.";
-  }
-
-  res.json({
-    focus: Math.round(focus),
-    stress: Math.round(stress),
-    confusion,
-    label,
-    recommendation,
-    deepFocusSuggested,
-  });
+  res.json(getNeuroScorePayload());
 });
 
 app.get("/api/intent", (_req, res) => {
-  const s = mockSignals();
-  let intent = "coding";
-  let confidence = 0.78;
-  const signals = [`Domain: ${s.activeDomain}`, `Keywords: ${s.titleKeywords.slice(0, 2).join(", ")}`];
-  if (s.titleKeywords.some((k) => /lecture|video|course/i.test(k))) {
-    intent = "studying";
-    confidence = 0.71;
-  } else if (s.tabSwitchesPerMin > 8) {
-    intent = "browsing";
-    confidence = 0.62;
-  }
-  res.json({ intent, confidence, signals });
+  res.json(getIntentPayload());
 });
 
 app.get("/api/predict-attention", (_req, res) => {
-  res.json({
-    taskLabel: "Code review on PR #184",
-    estimatedMinutesRemaining: 6,
-    confidence: 0.74,
-    rationale: "Stable dwell on diff view + low backtrack → you’ll likely finish coding in ~6 min; delay notifications.",
-  });
+  res.json(getPredictionPayload());
+});
+
+/** Extension / clients push tab signals; drives all dashboard metrics. */
+app.post("/api/context/ingest", (req, res) => {
+  try {
+    const merged = ingestContext(req.body || {});
+    res.json({ ok: true, ingested: merged, dashboard: getDashboardPayload() });
+  } catch (e) {
+    res.status(400).json({ error: String(e.message || e) });
+  }
+});
+
+/** Single SSE stream: NeuroScore + intent + prediction ~every 2s (aligned snapshot). */
+app.get("/api/dashboard/stream", (req, res) => {
+  res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
+  res.setHeader("Cache-Control", "no-cache, no-transform");
+  res.setHeader("Connection", "keep-alive");
+  res.setHeader("X-Accel-Buffering", "no");
+  if (typeof res.flushHeaders === "function") res.flushHeaders();
+
+  const push = () => {
+    res.write(`data: ${JSON.stringify(getDashboardPayload())}\n\n`);
+  };
+  push();
+  const interval = setInterval(push, 2000);
+  req.on("close", () => clearInterval(interval));
+});
+
+/** Unified live snapshot for Flows architecture diagram (~2s). */
+app.get("/api/architecture/stream", (req, res) => {
+  res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
+  res.setHeader("Cache-Control", "no-cache, no-transform");
+  res.setHeader("Connection", "keep-alive");
+  res.setHeader("X-Accel-Buffering", "no");
+  if (typeof res.flushHeaders === "function") res.flushHeaders();
+
+  const push = () => {
+    const dash = getDashboardPayload();
+    const queue = getNotificationQueueSnapshot();
+    const dna = getDnaActionCountsForAnalytics();
+    const ingest = getIngestMeta();
+    const pendingAgent = agentQueue.filter((a) => a.status !== "done").length;
+    const needsApproval = agentQueue.filter((a) => a.status === "needs_approval").length;
+    const runningAgent = agentQueue.filter((a) => a.status === "running").length;
+
+    const payload = {
+      serverTime: Date.now(),
+      ingest: {
+        lastIngestAt: ingest.lastIngestAt,
+        hasLiveIngest: dash.signals.hasLiveIngest,
+      },
+      signals: dash.signals,
+      neuroScore: dash.neuroScore,
+      intent: dash.intent,
+      prediction: dash.prediction,
+      notifications: {
+        queueSize: queue.length,
+        gmailConnected: gmailNotificationCache.connected,
+        gmailEmail: gmailNotificationCache.email,
+        gmailFetchedAt: gmailNotificationCache.fetchedAt,
+        inboxSource:
+          gmailNotificationCache.items && gmailNotificationCache.items.length > 0 ? "gmail" : "demo",
+      },
+      dna: {
+        delayed: dna.delayed,
+        batched: dna.batched,
+        shown: dna.shown,
+        failSafeConfidence: FAILSAFE_CONFIDENCE,
+      },
+      agent: {
+        total: agentQueue.length,
+        pending: pendingAgent,
+        needsApproval,
+        running: runningAgent,
+      },
+      flows: {
+        activeAutomations: 2,
+        streamIntervalMs: 2000,
+      },
+    };
+    res.write(`data: ${JSON.stringify(payload)}\n\n`);
+  };
+
+  push();
+  const interval = setInterval(push, 2000);
+  req.on("close", () => clearInterval(interval));
 });
 
 /** Attention Market — user overrides + action log (in-memory demo) */
@@ -1261,47 +1306,44 @@ app.get("/api/flows", (_req, res) => {
   });
 });
 
-app.get("/api/analytics", (_req, res) => {
-  const weeklyFocusByDay = [
-    { day: "Mon", focus: 71 },
-    { day: "Tue", focus: 84 },
-    { day: "Wed", focus: 62 },
-    { day: "Thu", focus: 79 },
-    { day: "Fri", focus: 88 },
-    { day: "Sat", focus: 55 },
-    { day: "Sun", focus: 48 },
-  ];
-  const timeAllocationMinutes = [
-    { key: "deep", label: "Deep work", minutes: 420 },
-    { key: "meetings", label: "Meetings & calls", minutes: 195 },
-    { key: "distraction", label: "Distraction / context loss", minutes: 94 },
-    { key: "shallow", label: "Shallow tasks & email", minutes: 165 },
-    { key: "breaks", label: "Breaks & recovery", minutes: 118 },
-  ];
-  const dnaDecisionsWeek = [
-    { label: "Delayed wisely", count: 132 },
-    { label: "Batched / summarized", count: 91 },
-    { label: "Shown immediately", count: 38 },
-  ];
-  const totalMin = timeAllocationMinutes.reduce((a, x) => a + x.minutes, 0);
-  const deepPct = Math.round((timeAllocationMinutes[0].minutes / totalMin) * 100);
+function getDnaActionCountsForAnalytics() {
+  let delayed = 0;
+  let batched = 0;
+  let shown = 0;
+  for (const e of notificationActionLog) {
+    const a = e.action;
+    if (a === "delay") delayed += 1;
+    else if (a === "digest") batched += 1;
+    else if (a === "force_show" || a === "block_confirm") shown += 1;
+  }
+  return { delayed, batched, shown };
+}
 
-  res.json({
-    focusScoreWeek: 78,
-    distractionMinutes: 94,
-    trendPercent: 23,
-    streakDays: 5,
-    deepWorkHoursWeek: 7.0,
-    weeklyFocusByDay,
-    timeAllocationMinutes,
-    dnaDecisionsWeek,
-    insightHeadline: `Deep work is about ${deepPct}% of your tracked week — up with fewer “show now” interruptions.`,
-    insightBullets: [
-      "Mid-week dip (Wed) aligns with meeting load; DNA delayed 68% of pings that day.",
-      "Friday is your strongest focus day — good candidate for maker blocks.",
-      "Distraction time is down 23% vs last week; batching is doing the heavy lifting.",
-    ],
-  });
+function getAnalyticsResponseBody(weekOffset = 0) {
+  const gmailCount = gmailNotificationCache.items?.length ?? 0;
+  return buildAnalyticsPayload(getDnaActionCountsForAnalytics(), { gmailCount, weekOffset });
+}
+
+app.get("/api/analytics", (req, res) => {
+  const weekOffset = parseInt(String(req.query.weekOffset ?? "0"), 10) || 0;
+  res.json(getAnalyticsResponseBody(weekOffset));
+});
+
+app.get("/api/analytics/stream", (req, res) => {
+  const weekOffset = parseInt(String(req.query.weekOffset ?? "0"), 10) || 0;
+
+  res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
+  res.setHeader("Cache-Control", "no-cache, no-transform");
+  res.setHeader("Connection", "keep-alive");
+  res.setHeader("X-Accel-Buffering", "no");
+  if (typeof res.flushHeaders === "function") res.flushHeaders();
+
+  const push = () => {
+    res.write(`data: ${JSON.stringify(getAnalyticsResponseBody(weekOffset))}\n\n`);
+  };
+  push();
+  const interval = setInterval(push, 4000);
+  req.on("close", () => clearInterval(interval));
 });
 
 app.post("/api/voice-command", (req, res) => {
@@ -1327,7 +1369,7 @@ app.post("/api/voice-command", (req, res) => {
 });
 
 app.post("/api/context/refresh", (_req, res) => {
-  res.json({ ok: true, ingested: mockSignals() });
+  res.json({ ok: true, ...getDashboardPayload() });
 });
 
 app.get("/api/health", (_req, res) => {

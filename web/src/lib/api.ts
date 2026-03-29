@@ -166,17 +166,33 @@ export type PriorityAnalyzeResult = {
   rationale: string;
 };
 
+export type WeeklyStreakCell = {
+  day: string;
+  streak: number;
+  dateLabel: string;
+  beforeOrigin?: boolean;
+  future?: boolean;
+};
+
 export type AnalyticsPayload = {
   focusScoreWeek: number;
   distractionMinutes: number;
   trendPercent: number;
   streakDays: number;
+  /** Mon–Sun streak value per day; see server (28 Mar 2026 origin; past weeks = 7 each). */
+  weeklyStreakByDay?: WeeklyStreakCell[];
   deepWorkHoursWeek: number;
   weeklyFocusByDay: { day: string; focus: number }[];
   timeAllocationMinutes: { key: string; label: string; minutes: number }[];
   dnaDecisionsWeek: { label: string; count: number }[];
   insightHeadline: string;
   insightBullets: string[];
+  /** Present when payload comes from live engine / SSE */
+  serverTime?: number;
+  live?: boolean;
+  /** 0 = this week; charts use a stable anchor for past weeks */
+  weekOffset?: number;
+  weekRangeLabel?: string;
 };
 
 export const api = {
@@ -192,7 +208,8 @@ export const api = {
   focusExit: () => get<FocusExit>("/focus-exit"),
   agentQueue: () => get<{ actions: AgentAction[] }>("/agent/queue"),
   flows: () => get<{ flows: { id: string; name: string; steps: FlowStep[]; enabled: boolean }[] }>("/flows"),
-  analytics: () => get<AnalyticsPayload>("/analytics"),
+  analytics: (weekOffset = 0) =>
+    get<AnalyticsPayload>(`/analytics${weekOffset > 0 ? `?weekOffset=${weekOffset}` : ""}`),
   command: (text: string) => post<{ interpreted: string; actions: string[] }>("/voice-command", { text }),
 
   overrideRules: () => get<{ override_rules: OverrideRule[] }>("/overrides/rules"),
@@ -238,7 +255,19 @@ export const api = {
     preferences?: Partial<PriorityPreferences>;
   }) => post<PriorityAnalyzeResult>("/priority/analyze", body),
 
-  refreshContext: () => post<{ ok: boolean }>("/context/refresh", {}),
+  refreshContext: () =>
+    post<{ ok: boolean; neuroScore?: NeuroScore; intent?: Intent; prediction?: Prediction }>("/context/refresh", {}),
+  contextIngest: (body: Record<string, unknown>) =>
+    post<{
+      ok: boolean;
+      ingested: Record<string, unknown>;
+      dashboard: {
+        neuroScore: NeuroScore;
+        intent: Intent;
+        prediction: Prediction;
+        serverTime: number;
+      };
+    }>("/context/ingest", body),
   agentMessage: (text: string) => post<{ reply: string; enqueued: AgentAction[] }>("/agent/message", { text }),
   agentApprove: (id: string) => post<{ ok: boolean; action: AgentAction }>("/agent/approve", { id }),
   agentReject: (id: string) => post<{ ok: boolean; action: AgentAction }>("/agent/reject", { id }),

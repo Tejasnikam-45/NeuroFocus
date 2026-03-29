@@ -141,14 +141,14 @@ export function PriorityIntelligencePage() {
         <p className="mt-4 text-sm italic text-amber-400/85 border-l-2 border-amber-500/40 pl-4">{DEMO_LINE}</p>
       </header>
 
-      <div className="rounded-2xl border border-zinc-800/80 bg-zinc-950/50 p-5 font-mono text-xs text-zinc-400">
+      <div className="flow-strip">
         <span className="text-zinc-500">Flow · </span>
-        <span className="text-zinc-300">Incoming task</span>
-        <span className="text-zinc-600"> → </span>
+        <span className="text-zinc-200 dark:text-zinc-300">Incoming task</span>
+        <span className="text-zinc-500 dark:text-zinc-600"> → </span>
         <span className="text-amber-400/90">Priority engine</span>
-        <span className="text-zinc-600"> → </span>
-        <span className="text-zinc-300">Scores</span>
-        <span className="text-zinc-600"> → </span>
+        <span className="text-zinc-500 dark:text-zinc-600"> → </span>
+        <span className="text-zinc-200 dark:text-zinc-300">Scores</span>
+        <span className="text-zinc-500 dark:text-zinc-600"> → </span>
         <span className="text-teal-300/90">Decision / Override / Explain</span>
       </div>
 
@@ -391,7 +391,7 @@ export function PriorityIntelligencePage() {
         <Link to="/cognitive-transparency" className="text-violet-400/90 hover:text-violet-300">
           Cognitive Transparency
         </Link>
-        <span className="text-zinc-700">·</span>
+        <span className="text-zinc-400 dark:text-zinc-600">·</span>
         <Link to="/decision-override" className="text-teal-400/90 hover:text-teal-300">
           Decision Override
         </Link>
